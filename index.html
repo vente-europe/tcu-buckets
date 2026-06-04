@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TCU - Stock vs 12mo EU Velocity</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", sans-serif; margin: 0; padding: 28px; background: #f3f4f7; color: #1a1f2e; line-height: 1.45; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  h2 { font-size: 17px; margin: 28px 0 12px; color: #2a3450; }
+  .sub { color: #6b7280; font-size: 13px; margin-bottom: 24px; }
+  .layout { max-width: 1300px; margin: 0 auto; }
+  .nav { background: #fff; border: 1px solid #d4d9e3; border-radius: 6px; padding: 10px 16px; margin-bottom: 20px; font-size: 13px; }
+  .nav a { color: #1a4a8a; text-decoration: none; font-weight: 600; }
+  .nav a:hover { text-decoration: underline; }
+  .nav .sep { color: #d4d9e3; margin: 0 12px; }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
+  .kpi { background: #fff; border: 1px solid #d4d9e3; border-radius: 8px; padding: 14px 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); position: relative; }
+  .kpi .lbl { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+  .kpi .val { font-size: 22px; font-weight: 700; margin-top: 4px; color: #1a4a8a; }
+  .kpi .small { font-size: 12px; color: #6b7280; margin-top: 2px; }
+  .kpi.warn .val { color: #b8540a; }
+  .kpi.crit .val { color: #b02020; }
+  .kpi.good .val { color: #2a7a2a; }
+
+  /* Info tooltip */
+  .info-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #c4cad6;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: serif;
+    cursor: help;
+    text-transform: none;
+    position: relative;
+  }
+  .info-icon:hover { background: #5b9bd5; }
+  .info-icon .tooltip {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    bottom: 130%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a1f2e;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.4;
+    letter-spacing: 0;
+    width: 260px;
+    text-align: left;
+    z-index: 100;
+    pointer-events: none;
+    transition: opacity 0.15s, visibility 0.15s;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  }
+  .info-icon .tooltip::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: #1a1f2e;
+  }
+  .info-icon:hover .tooltip {
+    visibility: visible;
+    opacity: 1;
+  }
+
+  .split-card { background: #fff; border: 1px solid #d4d9e3; border-radius: 8px; padding: 18px 22px; margin-bottom: 18px; }
+  .split-bar { display: flex; height: 36px; border-radius: 6px; overflow: hidden; margin: 12px 0 6px; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08); }
+  .split-bar > div { display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 13px; }
+  .split-bar .sold { background: linear-gradient(180deg, #2e9d2e, #1e7a1e); }
+  .split-bar .remaining { background: linear-gradient(180deg, #d6a020, #b8540a); }
+  .legend { display: flex; gap: 18px; font-size: 12px; color: #4a5470; }
+  .legend .dot { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: middle; }
+  .dot.sold { background: #2e9d2e; }
+  .dot.remaining { background: #d6a020; }
+
+  .insight-card { background: #fff8e6; border: 1px solid #e8c97a; border-radius: 8px; padding: 16px 22px; margin-bottom: 18px; }
+  .insight-card h3 { margin: 0 0 8px; color: #6a4500; font-size: 15px; }
+  .insight-card ul { margin: 6px 0 0 18px; padding: 0; }
+  .insight-card li { margin-bottom: 4px; font-size: 13px; color: #4a3a00; }
+
+  /* Bucket model section */
+  .bucket-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px; }
+  .bucket-card { background: #fff; border: 1px solid #d4d9e3; border-radius: 8px; padding: 16px 20px; border-top: 4px solid #aaa; }
+  .bucket-card.fast { border-top-color: #2e9d2e; }
+  .bucket-card.slow { border-top-color: #d6a020; }
+  .bucket-card.dead { border-top-color: #b02020; }
+  .bucket-card .name { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+  .bucket-card.fast .name { color: #2e9d2e; }
+  .bucket-card.slow .name { color: #d6a020; }
+  .bucket-card.dead .name { color: #b02020; }
+  .bucket-card .desc { font-size: 12px; color: #6b7280; margin: 2px 0 12px; }
+  .bucket-card .stat { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; border-bottom: 1px solid #f0f2f6; }
+  .bucket-card .stat:last-child { border-bottom: 0; }
+  .bucket-card .stat .v { font-weight: 600; }
+
+  /* Recovery curve */
+  .recovery-card { background: #fff; border: 1px solid #d4d9e3; border-radius: 8px; padding: 18px 22px; margin-bottom: 18px; }
+  .recovery-card h2 { margin-top: 0; }
+  .rcv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .rcv-table th, .rcv-table td { padding: 6px 10px; text-align: right; border-bottom: 1px solid #eef0f3; }
+  .rcv-table th { background: #f0f2f6; color: #4a5470; font-size: 11px; text-transform: uppercase; }
+  .rcv-table th:first-child, .rcv-table td:first-child { text-align: left; }
+  .rcv-table .col-fast { background: rgba(46, 157, 46, 0.07); }
+  .rcv-table .col-slow { background: rgba(214, 160, 32, 0.07); }
+  .rcv-table .col-dead { background: rgba(176, 32, 32, 0.07); }
+  .rcv-table tr.milestone-12 td { background: #fff3c0 !important; font-weight: 600; }
+  .rcv-table tr.milestone-final td { color: #b02020; font-weight: 600; }
+  .rcv-meta { font-size: 12px; color: #6b7280; margin-top: 8px; }
+
+  /* Offer scenarios */
+  .offer-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .offer-card { background: #fff; border: 1px solid #d4d9e3; border-radius: 8px; padding: 16px 20px; border-left: 4px solid #aaa; }
+  .offer-card.opening { border-left-color: #b02020; }
+  .offer-card.target { border-left-color: #1a4a8a; background: #f0f8ff; }
+  .offer-card.ceiling { border-left-color: #2e7a2e; }
+  .offer-card .tier { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #4a5470; }
+  .offer-card .value-28 { font-size: 24px; font-weight: 700; color: #1a1f2e; margin: 6px 0 2px; }
+  .offer-card .value-57 { font-size: 14px; color: #6b7280; }
+  .offer-card .posture { font-size: 12px; color: #4a5470; margin-top: 8px; line-height: 1.4; }
+  .offer-card .formula { font-size: 11px; color: #6b7280; margin-top: 6px; font-family: "SF Mono", monospace; }
+
+  /* Per-SKU table */
+  table#tbl { width: 100%; border-collapse: collapse; font-size: 12px; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  table#tbl th, table#tbl td { padding: 8px 10px; text-align: right; border-bottom: 1px solid #eef0f3; }
+  table#tbl th { background: #f0f2f6; font-weight: 600; color: #4a5470; text-align: right; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; }
+  table#tbl th:first-child, table#tbl td:first-child, table#tbl td.lt { text-align: left; }
+  table#tbl td.lt { color: #1a1f2e; font-weight: 500; }
+  table#tbl tr:hover td { background: #fafbfc; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .pill.good { background: #d6f5d6; color: #2a7a2a; }
+  .pill.partial { background: #ffe8b0; color: #8a4500; }
+  .pill.dead { background: #fde2e2; color: #a02020; }
+  .bucket-pill { display: inline-block; padding: 1px 7px; border-radius: 3px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; }
+  .bucket-pill.fast { background: #d6f5d6; color: #1e7a1e; }
+  .bucket-pill.slow { background: #ffe8b0; color: #8a4500; }
+  .bucket-pill.dead { background: #fde2e2; color: #a02020; }
+
+  .neg-card { background: #f0f8ff; border-left: 4px solid #5b9bd5; padding: 16px 22px; margin-top: 20px; border-radius: 6px; }
+  .neg-card h3 { margin: 0 0 10px; color: #1a4a8a; font-size: 15px; }
+  .neg-card .row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 8px; }
+  .neg-card .block { background: #fff; padding: 10px 14px; border-radius: 6px; border: 1px solid #d4d9e3; }
+  .neg-card .lbl { font-size: 11px; color: #6b7280; text-transform: uppercase; font-weight: 600; }
+  .neg-card .val { font-size: 18px; font-weight: 700; color: #1a4a8a; margin: 2px 0; }
+  .neg-card .small { font-size: 11px; color: #6b7280; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<h1>TCU - Stock vs 12-month EU sales velocity</h1>
+<p class="sub">
+  Velocity window: <b id="window">-</b> (full year, includes BFCM + Christmas + New Year peak)
+  · EU markets only (DE + FR + IT + ES, no UK)
+  · COGS: per-ASIN from historical P&amp;L (£1.93/u fallback for items with no sales history)
+</p>
+
+<div class="nav">
+  📊 You're viewing the static analysis.
+  &nbsp;<span class="sep">·</span>&nbsp;
+  <a href="stock_calculator.html">→ Open interactive Stock Offer Calculator</a>
+  (edit quantities + per-ASIN COGS, see live offer recalc)
+</div>
+
+<!-- Executive summary / key findings -->
+<div style="background:#fff;border:1px solid #d4d9e3;border-left:5px solid #1a4a8a;border-radius:8px;padding:20px 24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+  <h3 style="margin:0 0 12px 0;color:#1a4a8a;font-size:16px;text-transform:uppercase;letter-spacing:0.5px">Key findings - basis for the offer</h3>
+  <p style="margin:0 0 10px 0;font-size:14px;color:#2a3450;line-height:1.55">
+    Looking at the last 12 months of EU sales velocity (May 2025 – Apr 2026, full year including BFCM + Christmas), the stock splits cleanly into 3 buckets with very different recovery profiles:
+  </p>
+  <ul style="margin:8px 0 12px 18px;padding:0;font-size:14px;color:#2a3450;line-height:1.65">
+    <li><b style="color:#2a7a2a">FAST stock</b> - at current velocity Mothership would recover <b>~97% of COGS</b> within 12 months if they sold it themselves</li>
+    <li><b style="color:#b8540a">SLOW stock</b> - only <b>~10% of units</b> would sell in 12 months (≈13.5% of SLOW COGS recovered); the rest takes 24-36+ months</li>
+    <li><b style="color:#b02020">DEAD stock</b> - <b>0% recovery</b>: zero EU sales across the entire year despite Black Friday and Christmas peaks</li>
+  </ul>
+  <p style="margin:10px 0 0 0;font-size:14px;color:#2a3450;line-height:1.55">
+    <b>Therefore I propose 3 different buckets with 3 distinct discount levels</b> - <b>80% / 50% / 30% of COGS respectively</b> - to reflect the very different value each bucket represents. The discounts are calibrated against Mothership's realistic 12-month recovery, with logic explained per bucket below. All of this is offered as <b>full upfront cash payment for the entire stock in one go</b> - zero installments, zero security collateral, zero operational handover delays.
+  </p>
+</div>
+
+<!-- TOP KPIs -->
+<div class="kpi-row" id="kpis"></div>
+
+<!-- Bucket model -->
+<h2>3-bucket velocity model</h2>
+<p class="sub">SKUs classified by 12mo EU monthly velocity (full-year, captures seasonal peaks).</p>
+<div class="bucket-grid" id="buckets"></div>
+
+<!-- 12-month split -->
+<div class="split-card">
+  <h2 style="margin-top:0">12-month outcome: stock split (units)</h2>
+  <p class="sub" style="margin-bottom:0">If 12-month EU velocity (May 2025 – Apr 2026, full-year including BFCM + Xmas peak) holds steady for the next 12 months - what % of current stock will sell vs. sit?</p>
+  <div class="split-bar" id="splitBar"></div>
+  <div class="legend">
+    <span><span class="dot sold"></span> <b id="legSold"></b> sold in 12 months (FAST + SLOW)</span>
+    <span><span class="dot remaining"></span> <b id="legRem"></b> remaining (FAST remainder + SLOW remainder + DEAD)</span>
+  </div>
+</div>
+
+<!-- COGS recovery -->
+<div class="recovery-card">
+  <h2 style="margin-top:0">COGS recovery curve (what Mothership realistically recovers by month X)</h2>
+  <p class="sub">Bucket-aware: FAST clears fast, SLOW dribbles, DEAD never moves. Per-ASIN COGS from historical P&amp;L.</p>
+  <table class="rcv-table" id="rcvTable"></table>
+  <p class="rcv-meta" id="rcvMeta"></p>
+</div>
+
+<!-- Proposed discount for each bucket -->
+<h2>Proposed discount for each bucket</h2>
+<p class="sub">For each bucket we compare <b>what Mothership would realistically recover in 12mc on their own</b> vs. <b>what your cash-now offer gives them</b>. The multiplier reflects the gap - and the value transfer (time, risk, liability).</p>
+<div class="bucket-grid" style="margin-bottom:20px">
+  <div class="bucket-card fast">
+    <div class="name">FAST · COGS × 0.80</div>
+    <div class="desc">≥30 units/mo</div>
+    <div class="stat"><span>Portion of stock sold after 12m</span><span class="v" style="color:#2a7a2a">~97.6%</span></div>
+    <div class="stat"><span>Tom's offer</span><span class="v">80% of COGS</span></div>
+    <div class="stat" style="border:none;padding-top:10px;display:block">
+      <div style="font-size:13px;color:#1a1f2e;font-weight:600;margin-bottom:6px">Why 0.80?</div>
+      <ul style="font-size:13px;color:#4a5470;line-height:1.55;padding-left:18px;margin:4px 0 0 0">
+        <li><b>Time value of money</b> - based on retail-sector SME WACC of <b>10.5%</b> (<a href="https://valor-sme.com/resources/wacc-by-sector" target="_blank" rel="noopener" style="color:#1a4a8a">valor-sme.com</a>), present value of future revenue stream is lower than cash today</li>
+        <li><b>Inflation hedge</b> (real purchasing power erosion)</li>
+        <li><b>Operational burden eliminated</b> - no PPC monitoring, no restock decisions, no FBA replenishment, no account-health management, 0 customer service load</li>
+        <li><b>Cash-flow flexibility</b> (lump sum reinvestable on day 1)</li>
+      </ul>
+    </div>
+  </div>
+  <div class="bucket-card slow">
+    <div class="name">SLOW · COGS × 0.50</div>
+    <div class="desc">1–30 units/mo</div>
+    <div class="stat"><span>Portion of stock sold after 12m</span><span class="v" style="color:#b8540a">~10.8%</span></div>
+    <div class="stat"><span>Tom's offer</span><span class="v">50% of COGS</span></div>
+    <div class="stat" style="border:none;padding-top:10px;display:block">
+      <div style="font-size:13px;color:#1a1f2e;font-weight:600;margin-bottom:6px">Why 0.50?</div>
+      <ul style="font-size:13px;color:#4a5470;line-height:1.55;padding-left:18px;margin:4px 0 0 0">
+        <li><b>Time value of money</b> - based on retail-sector SME WACC of <b>10.5%</b> (<a href="https://valor-sme.com/resources/wacc-by-sector" target="_blank" rel="noopener" style="color:#1a4a8a">valor-sme.com</a>), present value of future revenue stream is lower than cash today</li>
+        <li><b>Tail beyond 12 months</b> - takes 24-36 months to clear at this velocity</li>
+        <li><b>RISK - SLOW could become DEAD</b> (velocity is fragile)</li>
+        <li><b>Operational burden eliminated</b> - no PPC monitoring, no restock decisions, no FBA replenishment, no account-health management, 0 customer service load</li>
+        <li><b>After 12 months Mothership would only recover 13.5% of COGS</b></li>
+      </ul>
+    </div>
+  </div>
+  <div class="bucket-card dead">
+    <div class="name">DEAD · COGS × 0.30</div>
+    <div class="desc">0 units/mo across full 12mo</div>
+    <div class="stat"><span>Portion of stock sold after 12m</span><span class="v" style="color:#b02020">0%</span></div>
+    <div class="stat"><span>Tom's offer</span><span class="v">30% of COGS</span></div>
+    <div class="stat" style="border:none;padding-top:10px;display:block">
+      <div style="font-size:13px;color:#1a1f2e;font-weight:600;margin-bottom:6px">Why 0.30?</div>
+      <ul style="font-size:13px;color:#4a5470;line-height:1.55;padding-left:18px;margin:4px 0 0 0">
+        <li><b>0 EU sales over the full year</b> (including Black Friday and Christmas)</li>
+        <li><b>Majority of this stock would have to be sent to Europe</b> - listings would have to be created, that means PPC spend and launching new products in EU</li>
+        <li><b>Eventual disposal cost</b> - Mothership's realistic alternative is scrap/liquidation at ~15-20% of COGS</li>
+        <li><b>We offer 30% COGS = 50-100% MORE</b> than their realistic disposal outcome</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Bridge to interactive calculator -->
+<div style="margin-top:24px;padding:22px 28px;background:linear-gradient(135deg,#fff3e0 0%,#ffe1c4 100%);border:2px solid #e67855;border-radius:10px;color:#5a2d10;box-shadow:0 4px 14px rgba(230,120,85,0.25);position:relative">
+  <div style="position:absolute;top:-12px;left:20px;background:#e67855;color:#fff;font-size:11px;font-weight:700;letter-spacing:1.2px;padding:4px 12px;border-radius:4px;text-transform:uppercase">⚡ IMPORTANT - Next step</div>
+  <p style="margin:8px 0 0 0;font-size:16px;line-height:1.55;font-weight:500">
+    Once we agree on the <strong>discount logic shown above</strong>, we move to the
+    <a href="stock_calculator.html" style="color:#1a4a8a;font-weight:700;background:#fff;padding:3px 10px;border-radius:4px;text-decoration:none;border:2px solid #1a4a8a;display:inline-block;margin:0 4px">→ interactive Stock Offer Calculator</a>
+    where we fill in the <strong>real per-SKU stock values</strong> Mothership shares - that produces the <strong>final, binding stock price</strong>.
+  </p>
+  <p style="margin:10px 0 0 0;font-size:13px;color:#7a3818;font-style:italic">
+    The numbers shown are illustrative, based only on the 28,811 visible units. Final offer = calculator output once real quantities are known.
+  </p>
+  <p style="margin:10px 0 0 0;font-size:13px;color:#5a2d10;line-height:1.5;padding-top:10px;border-top:1px dashed #f0c476">
+    <b>Bonus - IP / Trademark discount logic:</b> the same orange % (currently <b>33.4%</b> of units unsellable after 12mo) directly maps to a proposed discount on the trademark / Amazon account transfer price. <b>Rationale:</b> brand value = ability to drive sales. 33% of stock with zero EU velocity during the full year (incl. BFCM + Xmas) is empirical evidence the brand doesn't drive demand for that part of the catalog. These are me-too products (bungees, boot bags) - customers buy on feature/price, not brand. As the real stock breakdown gets loaded into the calculator, the orange % adjusts, and so does the proposed IP discount (1:1 mapping).
+  </p>
+</div>
+
+<!-- Per-SKU table -->
+<h2>Per-SKU breakdown (sorted by stock size)</h2>
+<table id="tbl">
+  <thead>
+    <tr>
+      <th>SKU</th>
+      <th class="lt">Product</th>
+      <th>Bucket</th>
+      <th>Stock</th>
+      <th>EU FBA</th>
+      <th>UK FBA</th>
+      <th>WH</th>
+      <th>12mo EU vel</th>
+      <th>Vel/mo</th>
+      <th>COGS/u</th>
+      <th>COGS total</th>
+      <th>12mo sold</th>
+      <th>% remain</th>
+      <th>Mo to clear</th>
+      <th>Verdict</th>
+    </tr>
+  </thead>
+  <tbody id="tbody"></tbody>
+</table>
+
+</div>
+
+<script src="velocity_data.js"></script>
+<script>
+function fmt(n) { return Number(Math.round(n)).toLocaleString("en-US"); }
+function fmtPct(n) { return (n).toFixed(1) + "%"; }
+
+const data = window.STOCK_DATA;
+if (!data) {
+  document.body.innerHTML = '<p style="color:#a02020;padding:40px;font-size:18px;">Failed to load <code>velocity_data.js</code> - make sure the file is next to this HTML.</p>';
+} else {
+  const t = data.totals;
+  document.getElementById("window").textContent = data.window_label || data.window_6mo;
+
+  // KPIs
+  const kpis = [
+    {
+      lbl: "Total stock units",
+      val: fmt(t.stock_units),
+      small: "EU FBA + UK FBA + Scotland WH",
+      tip: null
+    },
+    {
+      lbl: "Total COGS",
+      val: "£" + fmt(data.total_cogs),
+      small: "Per-ASIN from historical P&L",
+      cls: "warn",
+      tip: "Sum of (qty × COGS/unit) per ASIN, using actual historical cost-of-goods from the 3-year P&L (business_data.js). For SKUs with no sales history (e.g. SKU 53 Football Boot Bag), £1.93/u fallback is used."
+    },
+    {
+      lbl: "EU monthly velocity",
+      val: fmt(t.monthly_velocity_eu),
+      small: "12mo avg, DE+FR+IT+ES",
+      cls: "good",
+      tip: "Moving average: total EU units sold (DE+FR+IT+ES) over the last 12 months (May 2025 - Apr 2026) ÷ 12. Full-year window includes BFCM + Christmas + New Year peak. UK excluded - handled separately."
+    },
+    {
+      lbl: "Sellable in 12mo",
+      val: fmt(t.sold_12mo) + " (" + fmtPct(t.pct_sold_12mo) + ")",
+      small: "min(stock, velocity × 12)",
+      cls: "good",
+      tip: "Stock that will be sold in 12 months at current velocity. Calculated per-SKU: min(current stock, monthly velocity × 12). For each SKU we take the smaller of 'stock we have' and 'demand we'd see' - whichever runs out first."
+    },
+    {
+      lbl: "Stuck after 12mo",
+      val: fmt(t.remaining_12mo) + " (" + fmtPct(t.pct_remaining_12mo) + ")",
+      small: "DEAD + SLOW tail + FAST overstock",
+      cls: "crit",
+      tip: "Total leftover after 12mo - sum from EVERY bucket: 7,916 from DEAD (zero velocity, never moves) + 1,242 from SLOW tail (low velocity, doesn't clear in 12mc) + 862 from FAST overstock (SKU 29 Tool Attachment over-stocked vs its velocity)."
+    },
+  ];
+  document.getElementById("kpis").innerHTML = kpis.map(k => {
+    const tipHtml = k.tip ? `<span class="info-icon">i<span class="tooltip">${k.tip}</span></span>` : "";
+    return `<div class="kpi ${k.cls || ""}"><div class="lbl">${k.lbl}${tipHtml}</div><div class="val">${k.val}</div><div class="small">${k.small}</div></div>`;
+  }).join("");
+
+  // Bucket cards
+  const bs = data.bucket_summary;
+  const totalStock = t.stock_units;
+  const totalCogs = data.total_cogs;
+  const bucketCards = [
+    { key: "fast", name: "FAST", desc: "≥30 units/mo (12mo avg)", data: bs.FAST },
+    { key: "slow", name: "SLOW", desc: "1–30 units/mo (12mo avg) · tail-heavy, slow", data: bs.SLOW },
+    { key: "dead", name: "DEAD", desc: "0 units/mo across 12mo · listing inactive / never sells", data: bs.DEAD },
+  ];
+  document.getElementById("buckets").innerHTML = bucketCards.map(b => `
+    <div class="bucket-card ${b.key}">
+      <div class="name">${b.name}</div>
+      <div class="desc">${b.desc}</div>
+      <div class="stat"><span>SKUs</span><span class="v">${b.data.n_skus}</span></div>
+      <div class="stat"><span>Stock</span><span class="v">${fmt(b.data.stock)} (${(b.data.stock/totalStock*100).toFixed(1)}%)</span></div>
+      <div class="stat"><span>COGS</span><span class="v">£${fmt(b.data.cogs)} (${(b.data.cogs/totalCogs*100).toFixed(1)}%)</span></div>
+      <div class="stat"><span>Velocity</span><span class="v">${fmt(b.data.vel_monthly)}/mo</span></div>
+    </div>
+  `).join("");
+
+  // Split bar
+  document.getElementById("splitBar").innerHTML =
+    `<div class="sold" style="flex:${t.pct_sold_12mo}">${fmtPct(t.pct_sold_12mo)}</div>` +
+    `<div class="remaining" style="flex:${t.pct_remaining_12mo}">${fmtPct(t.pct_remaining_12mo)}</div>`;
+  document.getElementById("legSold").textContent = fmt(t.sold_12mo) + " units (" + fmtPct(t.pct_sold_12mo) + ")";
+  document.getElementById("legRem").textContent = fmt(t.remaining_12mo) + " units (" + fmtPct(t.pct_remaining_12mo) + ")";
+
+  // Recovery curve - every column shows "sold so far" progress (top→bottom = increasing)
+  const totalStockK = data.totals.stock_units;
+  const tableHeader = `<thead><tr>
+    <th>Month</th>
+    <th>TOTAL COGS recovered (%)</th>
+    <th>Total stock sold (%)</th>
+    <th class="col-fast">FAST stock sold (%)</th>
+    <th class="col-fast">FAST COGS recovered (%)</th>
+    <th class="col-slow">SLOW stock sold (%)</th>
+    <th class="col-slow">SLOW COGS recovered (%)</th>
+    <th class="col-dead">DEAD stock sold (%)</th>
+  </tr></thead>`;
+  const tableBody = data.recovery_curve.map(r => {
+    const cls = r.month === 12 ? "milestone-12" : "";
+    const pctSold = (r.units_sold / totalStockK * 100);
+    return `<tr class="${cls}">
+      <td>${r.month} mo</td>
+      <td>${fmtPct(r.pct_total)}</td>
+      <td>${fmt(r.units_sold)} (${fmtPct(pctSold)})</td>
+      <td class="col-fast">${fmt(r.fast_units_sold)} (${fmtPct(r.pct_fast_units)})</td>
+      <td class="col-fast">${fmtPct(r.pct_fast)}</td>
+      <td class="col-slow">${fmt(r.slow_units_sold)} (${fmtPct(r.pct_slow_units)})</td>
+      <td class="col-slow">${fmtPct(r.pct_slow)}</td>
+      <td class="col-dead">0 (0.0%)</td>
+    </tr>`;
+  }).join("");
+  const fastStock = data.bucket_summary.FAST.stock;
+  const slowStock = data.bucket_summary.SLOW.stock;
+  const deadStockCnt = data.bucket_summary.DEAD.stock;
+  const maxSold = fastStock + slowStock;
+  const floorRow = `<tr class="milestone-final">
+    <td>∞ (floor)</td>
+    <td>${fmtPct(data.max_recoverable_cogs/totalCogs*100)}</td>
+    <td>${fmt(maxSold)} (${fmtPct(maxSold/totalStockK*100)})</td>
+    <td class="col-fast">${fmt(fastStock)} (100%)</td>
+    <td class="col-fast">100%</td>
+    <td class="col-slow">${fmt(slowStock)} (100%)</td>
+    <td class="col-slow">100%</td>
+    <td class="col-dead">0 (0.0%)</td>
+  </tr>`;
+  document.getElementById("rcvTable").innerHTML = tableHeader + "<tbody>" + tableBody + floorRow + "</tbody>";
+  document.getElementById("rcvMeta").innerHTML =
+    `Recovery curve flattens at ~12mc - FAST is mostly cleared (98%+ recovered), SLOW dribbles for 12+ mc, DEAD never moves. ` +
+    `Max ever recoverable at current velocity: <b>${fmtPct(data.max_recoverable_cogs/totalCogs*100)} of total COGS</b>.`;
+
+  // Offer scenarios
+  // Table
+  document.getElementById("tbody").innerHTML = data.per_sku.map(s => {
+    let verdict, vCls;
+    if (s.bucket === "DEAD" && s.stock_total > 0) { verdict = "DEAD"; vCls = "dead"; }
+    else if (s.pct_remaining_12mo > 30) { verdict = "PARTIAL"; vCls = "partial"; }
+    else { verdict = "CLEARS"; vCls = "good"; }
+    const monthsClear = s.months_to_clear !== null ? s.months_to_clear : "∞";
+    const bktCls = s.bucket.toLowerCase();
+    return `<tr>
+      <td>${s.sku}</td>
+      <td class="lt">${s.title.length > 45 ? s.title.slice(0, 45) + "…" : s.title}</td>
+      <td><span class="bucket-pill ${bktCls}">${s.bucket}</span></td>
+      <td><b>${fmt(s.stock_total)}</b></td>
+      <td>${fmt(s.stock_eu_fba)}</td>
+      <td>${fmt(s.stock_uk_fba)}</td>
+      <td>${fmt(s.stock_warehouse)}</td>
+      <td>${fmt(s.vel_window_eu_units || 0)}</td>
+      <td>${s.monthly_vel_eu}</td>
+      <td>£${s.cogs_per_unit.toFixed(2)}</td>
+      <td>£${fmt(s.cogs_total)}</td>
+      <td>${fmt(s.sold_12mo)}</td>
+      <td>${fmtPct(s.pct_remaining_12mo)}</td>
+      <td>${monthsClear}</td>
+      <td><span class="pill ${vCls}">${verdict}</span></td>
+    </tr>`;
+  }).join("");
+
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TCU Stock Offer Calculator</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #fbe4d8;
+    color: #2d1b14;
+    margin: 0;
+    padding: 20px;
+    line-height: 1.5;
+  }
+  .container { max-width: 1400px; margin: 0 auto; }
+  h1 { color: #2d1b14; margin: 0 0 8px 0; font-size: 28px; }
+  .subtitle { color: #7a5246; margin-bottom: 24px; font-size: 14px; }
+
+  .panel {
+    background: #ffffff;
+    border: 1px solid #f0c8b8;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(150, 80, 60, 0.06);
+  }
+  .panel-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #2d1b14;
+    margin: 0 0 12px 0;
+  }
+  .panel-narrow { padding: 16px; }
+
+  /* Collapsible logic panel */
+  details {
+    background: #ffffff;
+    border: 1px solid #f0c8b8;
+    border-radius: 8px;
+    padding: 0;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(150, 80, 60, 0.06);
+  }
+  details summary {
+    padding: 16px 20px;
+    cursor: pointer;
+    font-weight: 600;
+    color: #2d1b14;
+    list-style: none;
+  }
+  details summary::before { content: "▶ "; color: #b8806a; }
+  details[open] summary::before { content: "▼ "; }
+  details[open] summary { border-bottom: 1px solid #f0c8b8; }
+  details .details-body { padding: 16px 20px; }
+  details .details-body p { margin: 8px 0; color: #4a3128; font-size: 14px; }
+  details ul { color: #4a3128; font-size: 14px; }
+  details code { background: #fbe4d8; padding: 2px 6px; border-radius: 3px; color: #b8540a; font-size: 13px; }
+
+  /* Config grid */
+  .config-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+  }
+  .config-item label {
+    display: block;
+    font-size: 12px;
+    color: #7a5246;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .config-item input {
+    width: 100%;
+    background: #fdf4ee;
+    border: 1px solid #e8c0ac;
+    color: #2d1b14;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .config-item input:focus { outline: none; border-color: #e67855; }
+  .config-item .helper { font-size: 11px; color: #9c6d5d; margin-top: 4px; }
+
+  /* Summary cards */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .summary-card {
+    background: #fdf4ee;
+    border-left: 4px solid #c9a293;
+    padding: 12px 16px;
+    border-radius: 4px;
+  }
+  .summary-card.fast { border-left-color: #2e9d2e; }
+  .summary-card.slow { border-left-color: #d6a020; }
+  .summary-card.dead { border-left-color: #b02020; }
+  .summary-card.total { border-left-color: #1a4a8a; background: #e8f0fc; }
+  .summary-card .label {
+    font-size: 11px;
+    color: #7a5246;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .summary-card .value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #2d1b14;
+  }
+  .summary-card .sub {
+    font-size: 12px;
+    color: #7a5246;
+    margin-top: 2px;
+  }
+
+  /* Table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  thead th {
+    background: #fdf4ee;
+    color: #7a5246;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    padding: 10px 8px;
+    text-align: left;
+    border-bottom: 1px solid #e8c0ac;
+    position: sticky;
+    top: 0;
+  }
+  tbody td {
+    padding: 8px;
+    border-bottom: 1px solid #f5d7c5;
+    color: #2d1b14;
+  }
+  tbody tr:hover { background: #fef7f2; }
+  tbody td.right { text-align: right; }
+  tbody td.center { text-align: center; }
+
+  .bucket-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .bucket-FAST { background: #d6f5d6; color: #1e7a1e; }
+  .bucket-SLOW { background: #ffe8b0; color: #8a4500; }
+  .bucket-DEAD { background: #fde2e2; color: #a02020; }
+
+  .qty-input, .cogs-input {
+    width: 80px;
+    background: #fdf4ee;
+    border: 1px solid #e8c0ac;
+    color: #2d1b14;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 13px;
+    text-align: right;
+    font-family: inherit;
+  }
+  .cogs-input { width: 70px; }
+  .qty-input:focus, .cogs-input:focus { outline: none; border-color: #e67855; }
+
+  .offer-cell {
+    font-weight: 600;
+    color: #1e7a1e;
+  }
+  .offer-cell.zero { color: #9c6d5d; font-weight: 400; }
+  .full-value { color: #2d1b14; }
+  .full-value.zero { color: #9c6d5d; }
+  .unit-price { color: #7a5246; font-size: 12px; }
+  .asin-cell { font-family: "SF Mono", "Monaco", monospace; font-size: 12px; color: #7a5246; }
+  .asin-cell.unmapped { color: #b02020; font-weight: 600; }
+  .sku-cell { font-family: "SF Mono", "Monaco", monospace; font-size: 12px; color: #2d1b14; font-weight: 600; }
+  .rule-cell { color: #9c6d5d; font-size: 12px; font-family: "SF Mono", "Monaco", monospace; }
+
+  /* Quick actions */
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    background: #e8c0ac;
+    color: #2d1b14;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn:hover { background: #dba991; }
+  .btn-primary { background: #e67855; color: #fff; }
+  .btn-primary:hover { background: #d16542; }
+  .btn-secondary { background: #fdf4ee; border: 1px solid #e8c0ac; }
+
+  .baseline-note {
+    background: #fff8e6;
+    border-left: 4px solid #d6a020;
+    padding: 12px 16px;
+    border-radius: 4px;
+    color: #6a4500;
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+
+  .scenario-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .scenario {
+    background: #fdf4ee;
+    padding: 12px 16px;
+    border-radius: 4px;
+    border: 1px solid #f0c8b8;
+  }
+  .scenario .scen-name {
+    font-weight: 600;
+    color: #2d1b14;
+    margin-bottom: 4px;
+    font-size: 13px;
+  }
+  .scenario .scen-value {
+    font-size: 18px;
+    color: #1e7a1e;
+    font-weight: 700;
+  }
+  .scenario .scen-desc {
+    color: #7a5246;
+    font-size: 12px;
+    margin-top: 4px;
+  }
+
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>TCU Stock Offer Calculator</h1>
+  <div class="subtitle">Per-ASIN negotiation tool - 3 buckets by 6mo EU velocity, configurable pricing rules.</div>
+
+  <div class="baseline-note">
+    <strong>Baseline note:</strong> The 28,811-unit stock breakdown represents ~50% of what Mothership claims (57,000 units total).
+    The bucket logic applies to <em>each ASIN regardless of quantity</em> - fill in revised quantities as Mothership shares them
+    and offers recalculate instantly. Unmapped DEAD entries (e.g. Football Boot Bag, no EU listing) reflect SKUs with stock
+    but zero EU sales history.
+  </div>
+
+  <details>
+    <summary>How this calculator works (logic)</summary>
+    <div class="details-body">
+      <p><strong>3-bucket model</strong> based on each ASIN's 12-month EU velocity (May 2025 – Apr 2026, DE+FR+IT+ES summed - full-year window covers BFCM + Christmas + New Year peak):</p>
+      <ul>
+        <li><strong>FAST</strong> (≥30 units/month avg): self-selling. Mothership would recover ~94% COGS within 12 months. Pay <code>FAST × COGS</code> (default 0.80) - discount = time-value of cash-now vs. spread over 4-12 months.</li>
+        <li><strong>SLOW</strong> (1–30 units/month avg): tail-heavy. In 12 months only <b>~10.8% of units</b> sell (~13.5% of SLOW COGS recovered) - the rest dribbles over 24-36+ months. Pay <code>SLOW × COGS</code> (default 0.50) - Mothership still gets decent money up-front, you absorb the entire long tail + FBA storage burden + risk of SLOW→DEAD drift.</li>
+        <li><strong>DEAD</strong> (0 units/month across FULL 12mo): structurally dead - zero demand even during BFCM + Christmas peak. Pay <code>DEAD × COGS</code> (default 0.30 = 30% of COGS) - scrap-like value. Mothership can't sell these without PPC + listing rebuild + zero ROI guarantee. You're <em>buying their liability</em>, not their asset.</li>
+      </ul>
+      <p><strong>COGS per ASIN:</strong> pre-filled in the table from historical P&amp;L (3-year sales window). Each ASIN has its own COGS (e.g. Bungee 45cm ~£1.14, Garden Tool Belt ~£2.40). Editable per row - adjust as Mothership shares actual landed costs.</p>
+      <p><strong>Why the discount on FAST:</strong> Mothership would recover ~91% of FAST COGS in 6 months and 94% in 12 months at current velocity - but spread out, with capital tied up, FBA storage cost, and risk of velocity drop. Paying ~80% of each ASIN's COGS now compensates them fairly while delivering certainty + speed.</p>
+    </div>
+  </details>
+
+  <div class="panel">
+    <div class="panel-title">Pricing rules (helpers for the table below)</div>
+    <p style="color:#7a5246;font-size:13px;margin:0 0 8px 0;">
+      Each ASIN has its own COGS in the table (pre-filled from historical P&amp;L, editable per row).
+      All three multipliers apply to that per-row COGS - FAST/SLOW reflect time-value discount, DEAD reflects scrap-like value of unsellable stock.
+    </p>
+    <p style="color:#9c6d5d;font-size:12px;font-style:italic;margin:0 0 12px 0;">
+      (SKUs classified by 12mo EU monthly velocity (May 2025 – Apr 2026, full-year including BFCM + Christmas). The bucket determines the unit-price rule for negotiation.)
+    </p>
+    <div class="config-grid">
+      <div class="config-item">
+        <label>FAST × COGS</label>
+        <input type="number" id="cfg-fast" step="0.05" value="0.80">
+        <div class="helper">80% of each ASIN's COGS</div>
+      </div>
+      <div class="config-item">
+        <label>SLOW × COGS</label>
+        <input type="number" id="cfg-slow" step="0.05" value="0.50">
+        <div class="helper">50% of each ASIN's COGS<br>(only 10.8% units sell in 12mc, tail 24-36+ mc)</div>
+      </div>
+      <div class="config-item">
+        <label>DEAD × COGS</label>
+        <input type="number" id="cfg-dead" step="0.05" value="0.30">
+        <div class="helper">30% of each ASIN's COGS<br>(scrap-like, buying liability)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Summary</div>
+    <div class="summary-grid" id="summary-cards"></div>
+    <div class="scenario-grid">
+      <div class="scenario">
+        <div class="scen-name">Mothership full COGS ask</div>
+        <div class="scen-value" id="scen-cogs">-</div>
+        <div class="scen-desc">100% of COGS at current quantities</div>
+      </div>
+      <div class="scenario">
+        <div class="scen-name">Mothership realistic 12mc recovery</div>
+        <div class="scen-value" id="scen-12mc">-</div>
+        <div class="scen-desc">FAST 94% + SLOW 50% + DEAD 0% (undiscounted, spread over 12mc)</div>
+      </div>
+      <div class="scenario">
+        <div class="scen-name">Your cash-now offer</div>
+        <div class="scen-value" id="scen-offer">-</div>
+        <div class="scen-desc"><span id="scen-offer-pct">-</span> of full COGS</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Per-ASIN offer (edit quantities to update)</div>
+    <div class="actions">
+      <button class="btn btn-secondary" onclick="setAllToKnown()">Reset to known 28,811 baseline</button>
+      <button class="btn btn-secondary" onclick="scaleAll(57000/28811)">Scale ×1.98 to 57,000 baseline</button>
+      <button class="btn btn-secondary" onclick="scaleAll(2)">Scale ×2 (test extrapolation)</button>
+      <button class="btn btn-secondary" onclick="zeroAll()">Zero all</button>
+    </div>
+    <div style="overflow-x: auto;">
+      <table id="asin-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>SKU</th>
+            <th>ASIN</th>
+            <th>Product</th>
+            <th>Bucket</th>
+            <th>Rule applied</th>
+            <th class="right">12mo vel (u/mo)</th>
+            <th class="right">COGS/u (£)</th>
+            <th class="right">Quantity</th>
+            <th class="right">100% value (£)</th>
+            <th class="right">Unit price</th>
+            <th class="right">Offer (£)</th>
+          </tr>
+        </thead>
+        <tbody id="asin-rows"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script src="calculator_data.js"></script>
+<script>
+let DATA = null;
+let CFG = { fast: 0.80, slow: 0.50, dead: 0.30 };
+
+function load() {
+  if (!window.CALCULATOR_DATA) {
+    document.getElementById("asin-rows").innerHTML =
+      '<tr><td colspan="10" style="color:#fca5a5;padding:20px;">Failed to load calculator_data.js - make sure the file is next to the HTML.</td></tr>';
+    return;
+  }
+  DATA = window.CALCULATOR_DATA;
+  renderRows();
+  render();
+}
+
+function readConfig() {
+  CFG.fast = parseFloat(document.getElementById("cfg-fast").value) || 0;
+  CFG.slow = parseFloat(document.getElementById("cfg-slow").value) || 0;
+  CFG.dead = parseFloat(document.getElementById("cfg-dead").value) || 0;
+}
+
+function unitPrice(bucket, cogs_per_unit) {
+  if (bucket === "FAST") return cogs_per_unit * CFG.fast;
+  if (bucket === "SLOW") return cogs_per_unit * CFG.slow;
+  return cogs_per_unit * CFG.dead;  // DEAD = % of COGS (scrap-like)
+}
+
+function renderRows() {
+  const tbody = document.getElementById("asin-rows");
+  tbody.innerHTML = "";
+  DATA.rows.forEach((r, idx) => {
+    const tr = document.createElement("tr");
+    const unmapped = r.asin === "(no ASIN)";
+    const sku_label = r.sku_label || "-";
+    tr.innerHTML = `
+      <td>${idx + 1}</td>
+      <td class="sku-cell">${sku_label}</td>
+      <td class="asin-cell ${unmapped ? 'unmapped' : ''}">${r.asin}</td>
+      <td>${r.name}</td>
+      <td><span class="bucket-pill bucket-${r.bucket}">${r.bucket}</span></td>
+      <td class="rule-cell" id="rl-${idx}">-</td>
+      <td class="right">${r.monthly_vel_eu.toFixed(1)}</td>
+      <td class="right">
+        <input type="number" class="cogs-input" data-idx="${idx}" value="${r.cogs_per_unit.toFixed(2)}" min="0" step="0.01">
+      </td>
+      <td class="right">
+        <input type="number" class="qty-input" data-idx="${idx}" value="${r.qty_known}" min="0">
+      </td>
+      <td class="right full-value" id="fv-${idx}">-</td>
+      <td class="right unit-price" id="up-${idx}">-</td>
+      <td class="right offer-cell" id="of-${idx}">-</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function render() {
+  readConfig();
+  let totals = {
+    FAST: { qty: 0, offer: 0, cogs: 0 },
+    SLOW: { qty: 0, offer: 0, cogs: 0 },
+    DEAD: { qty: 0, offer: 0, cogs: 0 },
+  };
+  DATA.rows.forEach((r, idx) => {
+    const qtyInp = document.querySelector(`.qty-input[data-idx="${idx}"]`);
+    const cogsInp = document.querySelector(`.cogs-input[data-idx="${idx}"]`);
+    const qty = Math.max(0, parseInt(qtyInp.value) || 0);
+    const cogs_per_unit = Math.max(0, parseFloat(cogsInp.value) || 0);
+    r.qty_known = qty;
+    r.cogs_per_unit = cogs_per_unit;
+    const up = unitPrice(r.bucket, cogs_per_unit);
+    const offer = qty * up;
+    const cogs_total = qty * cogs_per_unit;
+    totals[r.bucket].qty += qty;
+    totals[r.bucket].offer += offer;
+    totals[r.bucket].cogs += cogs_total;
+
+    // Rule applied - human-readable formula
+    let rule;
+    if (r.bucket === "FAST") rule = `COGS × ${CFG.fast}`;
+    else if (r.bucket === "SLOW") rule = `COGS × ${CFG.slow}`;
+    else rule = `COGS × ${CFG.dead}`;
+    document.getElementById(`rl-${idx}`).textContent = rule;
+
+    const fvEl = document.getElementById(`fv-${idx}`);
+    fvEl.textContent = cogs_total > 0 ? `£${cogs_total.toLocaleString("en-GB", { maximumFractionDigits: 0 })}` : "£0";
+    fvEl.classList.toggle("zero", cogs_total === 0);
+
+    document.getElementById(`up-${idx}`).textContent = up > 0 ? `£${up.toFixed(2)}` : "-";
+    const ofEl = document.getElementById(`of-${idx}`);
+    ofEl.textContent = offer > 0 ? `£${offer.toLocaleString("en-GB", { maximumFractionDigits: 0 })}` : "£0";
+    ofEl.classList.toggle("zero", offer === 0);
+  });
+  renderSummary(totals);
+}
+
+function renderSummary(totals) {
+  const grand = {
+    qty: totals.FAST.qty + totals.SLOW.qty + totals.DEAD.qty,
+    offer: totals.FAST.offer + totals.SLOW.offer + totals.DEAD.offer,
+    cogs: totals.FAST.cogs + totals.SLOW.cogs + totals.DEAD.cogs,
+  };
+  // Mothership 12mc recovery (undiscounted): FAST 94% COGS, SLOW 50% COGS, DEAD 0% COGS
+  const recovery12 = totals.FAST.cogs * 0.94 + totals.SLOW.cogs * 0.50 + totals.DEAD.cogs * 0;
+  const fmt = n => `£${Math.round(n).toLocaleString("en-GB")}`;
+  const pct = grand.cogs > 0 ? (grand.offer / grand.cogs * 100).toFixed(1) : "-";
+
+  document.getElementById("summary-cards").innerHTML = `
+    <div class="summary-card fast">
+      <div class="label">FAST bucket</div>
+      <div class="value">${fmt(totals.FAST.offer)}</div>
+      <div class="sub">${totals.FAST.qty.toLocaleString()} units · ${fmt(totals.FAST.cogs)} COGS</div>
+    </div>
+    <div class="summary-card slow">
+      <div class="label">SLOW bucket</div>
+      <div class="value">${fmt(totals.SLOW.offer)}</div>
+      <div class="sub">${totals.SLOW.qty.toLocaleString()} units · ${fmt(totals.SLOW.cogs)} COGS</div>
+    </div>
+    <div class="summary-card dead">
+      <div class="label">DEAD bucket</div>
+      <div class="value">${fmt(totals.DEAD.offer)}</div>
+      <div class="sub">${totals.DEAD.qty.toLocaleString()} units · ${fmt(totals.DEAD.cogs)} COGS</div>
+    </div>
+    <div class="summary-card total">
+      <div class="label">TOTAL OFFER</div>
+      <div class="value">${fmt(grand.offer)}</div>
+      <div class="sub">${grand.qty.toLocaleString()} units total · ${pct}% of full COGS</div>
+    </div>
+  `;
+  document.getElementById("scen-cogs").textContent = fmt(grand.cogs);
+  document.getElementById("scen-12mc").textContent = fmt(recovery12);
+  document.getElementById("scen-offer").textContent = fmt(grand.offer);
+  document.getElementById("scen-offer-pct").textContent = grand.cogs > 0 ? `${pct}%` : "-";
+}
+
+function setAllToKnown() {
+  const d = window.CALCULATOR_DATA;
+  document.querySelectorAll(".qty-input").forEach(inp => {
+    const idx = parseInt(inp.dataset.idx);
+    inp.value = d.rows[idx].qty_known;
+  });
+  render();
+}
+
+function scaleAll(factor) {
+  document.querySelectorAll(".qty-input").forEach(inp => {
+    const v = parseInt(inp.value) || 0;
+    inp.value = Math.round(v * factor);
+  });
+  render();
+}
+
+function zeroAll() {
+  document.querySelectorAll(".qty-input").forEach(inp => inp.value = 0);
+  render();
+}
+
+// Wire up listeners
+document.addEventListener("DOMContentLoaded", () => {
+  ["cfg-fast", "cfg-slow", "cfg-dead"].forEach(id =>
+    document.getElementById(id).addEventListener("input", render)
+  );
+  document.getElementById("asin-rows").addEventListener("input", e => {
+    if (e.target.classList.contains("qty-input") || e.target.classList.contains("cogs-input")) render();
+  });
+  load();
+});
+</script>
+
+</body>
+</html>
